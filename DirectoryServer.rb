@@ -8,11 +8,17 @@ class DirectoryServer
     @ser_ips = Hash.new
     @ser_ports = Hash.new
     @directories[:ser_fns] = @ser_fns
-    @directories[:ser_ips] = @ser_ips
     @directories[:ser_ports] = @ser_ports
+    @directories[:ser_ips] = @ser_ips
+
+    # 2 existing files (1 on each server) 
+    # Put these in Directory
     @directories[:ser_fns]["hello"] = "hellofile.txt"
-    @directories[:ser_ips]["hellofile.txt"] = "134.226.32.10"
-    @directories[:ser_ports]["134.226.32.10"] = "2632"
+    @directories[:ser_fns]["xmas"] = "christmas.txt"
+    @directories[:ser_ports]["hellofile.txt"] = "2632"
+    @directories[:ser_ports]["christmas.txt"] = "2633"
+    @directories[:ser_ips]["2632"] = "134.226.32.10"
+    @directories[:ser_ips]["2633"] = "134.226.32.10"
     run
   end
 
@@ -35,14 +41,14 @@ class DirectoryServer
         $server_fn = fs_filename
       end
     end
-    @directories[:ser_ips].each do |other_name, fs_ip|
+    @directories[:ser_ports].each do |other_name, fs_port|
       if($server_fn == other_name)
-        $server_ip = fs_ip
+        $server_port = fs_port
       end
     end
-    @directories[:ser_ports].each do |other_server, fs_port|
-      if($server_ip == other_server)
-        $server_port = fs_port
+    @directories[:ser_ips].each do |other_server, fs_ip|
+      if($server_port == other_server)
+        $server_ip = fs_ip
       end
     end
     client.puts "SERVER:#{$server_ip} PORT:#{$server_port} FILENAME:#{$server_fn}"
