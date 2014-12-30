@@ -5,12 +5,10 @@ class FileServer0
   def initialize(size, ip, port)
     @fileserver = TCPServer.new(ip, port)
 
+    @error2 = "\nERROR 2:File size smaller than required."
+
     @size = size
     @jobs = Queue.new
-
-    @error0 = "\nERROR 0:File already exists.\n\n"
-    @error1 = "\nERROR 1:File does not exist.\n\n"
-    @error2 = "\nERROR 2:File size smaller than required."
 
     # Threadpooled Multithreaded Server to handle Client requests
     # Each thread store its’ index in a thread-local variable
@@ -61,22 +59,17 @@ class FileServer0
   # Client has requested to open a file
   def open_request(request, client)
     split_request = request.split(" ")
+    puts split_request
     filename = split_request[0][5..split_request[0].length]
     is_new = split_request[1][7..split_request[1].length]
-    if is_new == 1 #create new file request
-      if File.exist?(filename)
-        client.puts @error0
-      else
-        File.open(filename, "w"){ |somefile| somefile.puts "Hello new file!"}
-        client.puts "\nOK:#{filename}\n\n"
-      end
+    if is_new == "1" #create new file request
+      File.open(filename, "w"){ |somefile| somefile.puts "Hello new file!"}
+      puts "\nOK:#{filename}\n\n"
+      client.puts "\nOK:#{filename}\n\n"
     else
-      if File.exist?(filename)
-        File.open(filename)
-        client.puts "\nOK:#{filename}\n\n"
-      else client.puts @error1
-      end
-          end
+      File.open(filename)
+      client.puts "\nOK:#{filename}\n\n"
+    end
   end
 
   # Client has requested to close a file
@@ -109,14 +102,12 @@ class FileServer0
 
   # Client has requested to write to a file
   def write_request(request, client)
-    split_request = request.split(" ")
-    puts split_request
-    filename = split_request[0][6..split_request[0].length]
-    start_n = split_request[1][6..split_request[1].length].to_i
-    contents = split_request[2]
-    puts contents
+    filename = request[6..request.length]
+    request = client.gets.chomp
+    start_n = request[6..request.length].to_i
+    contents = client.gets
     if File.exist?(filename)
-      IO.binwrite(filename, contents, start_n) #need to fix this!
+      IO.binwrite(filename, contents, start_n)
       client.puts "\nOK:#{filename}\nSTART:#{start_n}\n\n"
     else client.puts @error1
     end
