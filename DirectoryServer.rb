@@ -17,8 +17,8 @@ class DirectoryServer
 
     # 2 existing files (1 on each server) 
     # Put these in Directory
-    @directories[:ser_fns]["hello"] = "hellofile.txt"
-    @directories[:ser_fns]["xmas"] = "christmasfile.txt"
+    @directories[:ser_fns]["hello.txt"] = "hellofile.txt"
+    @directories[:ser_fns]["xmas.txt"] = "christmasfile.txt"
     @directories[:ser_ports]["hellofile.txt"] = @fs_port0
     @directories[:ser_ports]["christmasfile.txt"] = @fs_port1
     @directories[:ser_ips][@fs_port0] = @fs_ip0
@@ -51,6 +51,7 @@ class DirectoryServer
   end
 
   def look_up_file(filename, client)
+    puts filename
     $server_fn
     $server_ip
     $server_port
