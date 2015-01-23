@@ -48,6 +48,8 @@ class FileServer0
             read_request(request, client)
           elsif request[0..5] == "WRITE:"
             write_request(request, client)
+	  elsif request[0..4] =="TIME:"
+	    time_request(request, client)
           end
         end
       end
@@ -88,15 +90,12 @@ class FileServer0
     filename = split_request[0][5..split_request[0].length]
     start_n = split_request[1][6..split_request[1].length].to_i
     len_n = split_request[2][7..split_request[2].length].to_i
-    if File.exist?(filename)
-      file_size = File.size(filename)
-      if start_n >= file_size || len_n > file_size
-        client.puts "#{@error2} (#{file_size})\n\n"
-      else
-        content = IO.binread(filename,len_n,start_n)
-        client.puts "\nOK:#{filename}\nSTART:#{start_n}\nLENGTH:#{len_n}\n#{content}\n\n"
-      end
-    else client.puts @error1
+    file_size = File.size(filename)
+    if start_n >= file_size || len_n > file_size
+      client.puts "#{@error2} (#{file_size})\n\n"
+    else
+      content = IO.binread(filename, file_size-1, 0)
+      client.puts "\nOK:#{filename}\nSTART:#{start_n}\nLENGTH:#{len_n}\n#{content}\n\n"
     end
   end
 
@@ -111,6 +110,11 @@ class FileServer0
       client.puts "\nOK:#{filename}\nSTART:#{start_n}\n\n"
     else client.puts @error1
     end
+  end
+
+  def time_request(request, client)
+    filename = request[5..request.length]
+    client.puts File.atime(filename)
   end
 
   # Shutdown, wait for all threads to exit.
