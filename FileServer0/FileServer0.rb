@@ -1,4 +1,4 @@
-require 'thread'
+require 'thread' 
 require "socket"
 
 class FileServer0
@@ -101,10 +101,13 @@ class FileServer0
 
   # Client has requested to write to a file
   def write_request(request, client)
+    puts request
     filename = request[6..request.length]
     request = client.gets.chomp
+    puts request
     start_n = request[6..request.length].to_i
     contents = client.gets
+    puts contents
     if File.exist?(filename)
       IO.binwrite(filename, contents, start_n)
       client.puts "\nOK:#{filename}\nSTART:#{start_n}\n\n"

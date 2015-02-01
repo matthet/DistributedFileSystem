@@ -1,5 +1,5 @@
-require 'thread'
-require "socket"
+require 'thread' 
+require "socket" 
 require 'time'
 
 class ClientProxy
@@ -13,7 +13,7 @@ class ClientProxy
 
     fs_port1 = 2633
     fs_ip1 = Socket.ip_address_list.find { |ai| ai.ipv4? && !ai.ipv4_loopback? }.ip_address
-    fileserver1 = TCPSocket.open(fs_ip1, fs_port1)
+    #fileserver1 = TCPSocket.open(fs_ip1, fs_port1)
 
     @fservers = Hash.new
     @ips = Hash.new
@@ -24,7 +24,7 @@ class ClientProxy
     @fservers[:ips][fs_port0] = fs_ip0
     @fservers[:ips][fs_port1] = fs_ip1
     @fservers[:tcps][fs_port0] = @fileserver0
-    @fservers[:tcps][fs_port1] = fileserver1
+    #@fservers[:tcps][fs_port1] = fileserver1
     @lookupserver
 
     # Open Directory Server Connection
@@ -58,34 +58,35 @@ class ClientProxy
         @is_new = @is_new[7..@is_new.length-1]
         @client_msg = @client_msg[0..4] << " " << "IS_NEW:" << @is_new
         @directoryserver.puts("FILENAME:#{@client_fn}")
-        listen_dserver(client)
       elsif @client_msg[0..4] == "READ:"
         @client_fn = @client_msg[5..@client_msg.length-1]
         start_pos = client.gets.chomp
-        length = client.gets.chomp
+        len = client.gets.chomp
         @start_n = start_pos[6..start_pos.length-1].to_i
-        @len_n = length[7..length.length-1].to_i
+        @len_n = len[7..len.length-1].to_i
         if File.exist?(@client_fn) #cached copy
           @accessTimeCache = File.atime(@client_fn)
           @cached = true
         end 
-        @client_msg = @client_msg[0..4] << " " << @start_pos << " " << @length
+        @client_msg = @client_msg[0..4] << " " << start_pos << " " << len
         @directoryserver.puts("FILENAME:#{@client_fn}")
-        listen_dserver(client)
       elsif @client_msg[0..5] == "CLOSE:"
         @client_fn = @client_msg[6..@client_msg.length-1]
         @client_msg = @client_msg[0..5]
         @directoryserver.puts("FILENAME:#{@client_fn}")
-        listen_dserver(client)
       elsif @client_msg[0..5] == "WRITE:"
-        @client_msg = @client_msg[0..5]
         @client_fn = @client_msg[6..@client_msg.length-1]
-        @start_pos_write = client.gets.chomp
-        @contents_to_write = client.gets.chomp
+        @start_n = client.gets.chomp
+        @contents = client.gets.chomp
+        if File.exist?(@client_fn) #cached copy
+          n = @start_n[6..@start_n.length-1].to_i
+	  IO.binwrite(@client_fn, @contents, n)          
+        end #write - through
         @directoryserver.puts("FILENAME:#{@client_fn}")
       else
         client.puts "ERROR -1:Only OPEN, CLOSE, READ, WRITE operations allowed"
       end
+      listen_dserver(client)
     end
   end
 
@@ -136,20 +137,23 @@ class ClientProxy
           listen_fserver(client)
 	end
       else #WRITE
-        @client_msg.insert(6,"#{@server_fn}")
-        @lookupserver.puts(@client_msg)
-        @lookupserver.puts(@start_pos_write)
-        @lookupserver.puts(@contents_to_write)
+        @lookupserver.puts("WRITE:#{@server_fn}")
+        @lookupserver.puts(@start_n)
+        @lookupserver.puts(@contents)
+	listen_fserver(client)
       end
     end
   end
 
+  # Listen for responses from file server.
+  # Could be resonses for 'Open', 'Close', 'Time' of last file access for caching
   def listen_fserver(client)
     line = @lookupserver.gets.chomp
     while line.empty? do
       line = @lookupserver.gets.chomp
     end
     msg = line
+    puts msg
     line = @lookupserver.gets.chomp
     while !line.empty? do
       msg = msg << "\n" << line
@@ -160,25 +164,10 @@ class ClientProxy
     client.puts("\n#{msg}")
   end
 
-  def listen_fserver_read(client)
-    line = @lookupserver.gets.chomp
-    while line.empty? do
-      line = @lookupserver.gets.chomp
-    end
-    msg = line
-    msg = msg << "\n" << @lookupserver.gets.chomp
-    msg = msg << "\n" << @lookupserver.gets.chomp
-    line = @lookupserver.gets.chomp
-    contents = ""
-    while !line.empty? do
-      contents = contents << line << "\n"
-      line = @lookupserver.gets.chomp
-    end
-    puts contents[@start_n..(@start_n + @len_n)]
-    msg = msg << "\n" << contents[@start_pos..@start_pos + @length]
-    client.puts("\n#{msg}")
-  end
+  # Reading, Caching ----------------------------------------------------------------------
 
+  # Check for stale data in cache.
+  # Compare file access time of file on server and cached copy.
   def check_cache_validity(client)
     msg = @lookupserver.gets.chomp
     while msg.empty? do
@@ -189,31 +178,56 @@ class ClientProxy
     if (compare <= 0) #Cache copy is valid
       cache_read(client)
     else
-      puts 
+      puts @client_msg
       @lookupserver.puts(@client_msg)
       listen_fserver_read(client)
-      validate_cache(client)
     end
   end
 
-  # Have a cached copy of the file to read
+  # File in cache, and is valid
   def cache_read(client)
     file_size = File.size(@client_fn)
-    start_n = @start_pos[6..@start_pos.length-1].to_i
-    len_n = @length[7..@length.length-1].to_i
 
-    if start_n >= file_size || len_n > file_size
+    if @start_n >= file_size || @len_n > file_size
       client.puts "#{@error2} (#{file_size})"
     else
-      content = IO.binread(@client_fn, len_n, start_n)
-      client.puts "\nOK:#{@client_fn}\nSTART:#{start_n}\nLENGTH:#{len_n}\n#{content}"
+      content = IO.binread(@client_fn, @len_n, @start_n)
+      client.puts "\nOK:#{@client_fn}\nSTART:#{@start_n}\nLENGTH:#{@len_n}\n#{content}"
     end
   end
 
-  def validate_cache(client)
-    puts "sheeesh" 
+  # Reading files from file servers
+  # Display only part of file specifically requested for by Client
+  # Cache file.
+  def listen_fserver_read(client)
+    line = @lookupserver.gets.chomp
+    while line.empty? do
+      line = @lookupserver.gets.chomp
+    end
+    msg = line
+    msg = msg << "\n" << @lookupserver.gets.chomp
+    msg = msg << "\n" << @lookupserver.gets.chomp
+    line = @lookupserver.gets.chomp
+    contents = ""
+    puts msg
+    while !line.empty? do
+      contents = contents << line << "\n"
+      line = @lookupserver.gets.chomp
+    end
+    msg = msg << "\n" << contents[@start_n..@start_n + @len_n]
+    client.puts("\n#{msg}")
+    validate_cache(contents, client)
+  end
+
+  # Save up to date file in cache
+  def validate_cache(contents, client)
+    File.delete(@client_fn)
+    File.open(@client_fn, "w")
+    IO.binwrite(@client_fn, contents, 0)
   end
 end
+
+# -----------------------------------------------------------------------------------------
 
 # Initialise the Proxy Server
 port = 2631
