@@ -1,4 +1,4 @@
-# CS4032: Distributed Systems
+## CS4032: Distributed Systems
 
 ### Distributed File System:
 
