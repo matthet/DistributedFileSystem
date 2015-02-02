@@ -1,9 +1,9 @@
-CS4032: Distributed Systems
+# CS4032: Distributed Systems
 
-Distributed File System:
+### Distributed File System:
 
-Transparent File Access
-Multiple File Servers
-Client Proxy
-Directory Server
-Test Client
+###### Transparent File Access
+###### Multiple File Servers
+###### Client Proxy
+###### Directory Server
+###### Test Client
