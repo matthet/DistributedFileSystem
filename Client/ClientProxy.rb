@@ -4,7 +4,9 @@ require 'time'
 
 class ClientProxy
   def initialize(ip, port)
-    @proxyserver = TCPServer.new(ip, port)
+    @port = port
+    @ip = ip
+    @proxyserver = TCPServer.new(@ip, @port)
 
     # Open File Server Connection(s)
     fs_port0 = 2632
@@ -13,7 +15,7 @@ class ClientProxy
 
     fs_port1 = 2633
     fs_ip1 = Socket.ip_address_list.find { |ai| ai.ipv4? && !ai.ipv4_loopback? }.ip_address
-    #fileserver1 = TCPSocket.open(fs_ip1, fs_port1)
+    fileserver1 = TCPSocket.open(fs_ip1, fs_port1)
 
     @fservers = Hash.new
     @ips = Hash.new
@@ -24,7 +26,7 @@ class ClientProxy
     @fservers[:ips][fs_port0] = fs_ip0
     @fservers[:ips][fs_port1] = fs_ip1
     @fservers[:tcps][fs_port0] = @fileserver0
-    #@fservers[:tcps][fs_port1] = fileserver1
+    @fservers[:tcps][fs_port1] = fileserver1
     @lookupserver
 
     # Open Directory Server Connection
@@ -49,8 +51,7 @@ class ClientProxy
     loop do
       client.puts "\nYour request: \n"
       @client_msg = client.gets.chomp
-      @client_fn = ""
-      @server_fn = ""
+      @client_fn = @server_fn = ""
       @cached = false
       if @client_msg[0..4] == "OPEN:"
         @client_fn = @client_msg[5..@client_msg.length-1]
@@ -58,6 +59,7 @@ class ClientProxy
         @is_new = @is_new[7..@is_new.length-1]
         @client_msg = @client_msg[0..4] << " " << "IS_NEW:" << @is_new
         @directoryserver.puts("FILENAME:#{@client_fn}")
+	listen_dserver(client)
       elsif @client_msg[0..4] == "READ:"
         @client_fn = @client_msg[5..@client_msg.length-1]
         start_pos = client.gets.chomp
@@ -70,10 +72,12 @@ class ClientProxy
         end 
         @client_msg = @client_msg[0..4] << " " << start_pos << " " << len
         @directoryserver.puts("FILENAME:#{@client_fn}")
+	listen_dserver(client)
       elsif @client_msg[0..5] == "CLOSE:"
         @client_fn = @client_msg[6..@client_msg.length-1]
         @client_msg = @client_msg[0..5]
         @directoryserver.puts("FILENAME:#{@client_fn}")
+	listen_dserver(client)
       elsif @client_msg[0..5] == "WRITE:"
         @client_fn = @client_msg[6..@client_msg.length-1]
         @start_n = client.gets.chomp
@@ -83,10 +87,18 @@ class ClientProxy
 	  IO.binwrite(@client_fn, @contents, n)          
         end #write - through
         @directoryserver.puts("FILENAME:#{@client_fn}")
+	listen_dserver(client)
+      elsif @client_msg[0..3] == "HELO"
+        nick_name = @client_msg[5..@client_msg.length-1]
+        client.puts "HELO #{nick_name}\nIP:#{@ip}\nPort:#{@port}\nStudentID:11374331"
+      elsif @client_msg[0..11] == "DISCONNECT:0"
+        client.close
+      elsif @client_msg == "KILL_SERVICE"
+        client.puts "Service Killed"
+        @proxyserver.close
       else
-        client.puts "ERROR -1:Only OPEN, CLOSE, READ, WRITE operations allowed"
+        client.puts "ERROR -1: Request not recognised."
       end
-      listen_dserver(client)
     end
   end
 
