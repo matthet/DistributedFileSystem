@@ -6,4 +6,5 @@
 ###### Multiple File Servers
 ###### Client Proxy
 ###### Directory Server
+###### Caching
 ###### Test Client
